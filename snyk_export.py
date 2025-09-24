@@ -1,12 +1,13 @@
 import os
 import sys
 import json
+import re
 import csv
 import uuid
 import time
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Union, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
@@ -53,12 +54,129 @@ class SnykExportAPI:
             "Content-Type": "application/json",
             "User-Agent": "snyk-export-tool/1.0"
         }
+        self._project_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._policy_ignore_cache: Dict[str, Dict[str, Any]] = {}
 
     def get_project_v1(self, org_id: str, project_id: str) -> Dict[str, Any]:
+        cache_key = (org_id, project_id)
+        if cache_key in self._project_cache:
+            return self._project_cache[cache_key]
         url = f"{self.V1_BASE}/org/{org_id}/project/{project_id}"
         r = requests.get(url, headers=self.headers_v1, timeout=30)
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+        self._project_cache[cache_key] = data
+        return data
+
+    def get_org_policies(self, org_id: str) -> Dict[str, Any]:
+        if org_id in self._policy_ignore_cache:
+            return self._policy_ignore_cache[org_id]
+        policies_url = f"{self.base_url}/orgs/{org_id}/policies?version={self.API_VERSION}"
+        resp = requests.get(policies_url, headers=self.headers, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+        ignore_map: Dict[str, Dict[str, Any]] = {}
+        for item in data.get("data", []):
+            attributes = item.get("attributes", {})
+            if attributes.get("policy_type") != "ignore":
+                continue
+            reasons = attributes.get("reasons", [])
+            for reason in reasons:
+                for issue in reason.get("issues", []):
+                    issue_id = issue.get("id") or issue.get("issue_id")
+                    if issue_id:
+                        ignore_map[issue_id] = {
+                            "reason": reason.get("reason"),
+                            "reason_type": reason.get("reason_type"),
+                            "notes": reason.get("notes"),
+                            "ignored_since": attributes.get("created_at"),
+                            "ignore_data": reason,
+                        }
+        self._policy_ignore_cache[org_id] = ignore_map
+        return ignore_map
+
+    def enrich_export_files(self, files: List[str]) -> None:
+        for file_path in files:
+            if not file_path.lower().endswith(".csv"):
+                continue
+            try:
+                df = pd.read_csv(file_path)
+            except Exception as exc:
+                console.print(f"[red]Failed to read {file_path}: {exc}")
+                continue
+
+            additional_cols = {
+                "PROJECT_CREATED_AT": [],
+                "PROJECT_TOTAL_DEPENDENCIES": [],
+                "PROJECT_SEVERITY_COUNTS": [],
+                "IGNORE_REASON": [],
+                "IGNORE_REASON_TYPE": [],
+                "IGNORE_NOTES": [],
+                "IGNORED_SINCE": [],
+            }
+
+            for _, row in df.iterrows():
+                org_id = row.get("ORG_PUBLIC_ID") or self.org_id
+                project_id = row.get("PROJECT_PUBLIC_ID")
+                project_created = ""
+                project_dependencies = ""
+                severity_counts = ""
+                ignore_reason = ""
+                ignore_reason_type = ""
+                ignore_notes = ""
+                ignored_since = ""
+
+                if org_id and project_id:
+                    try:
+                        project = self.get_project_v1(org_id, project_id)
+                        project_created = project.get("created", "")
+                        project_dependencies = project.get("totalDependencies", "")
+                        severity_counts = json.dumps(project.get("issueCountsBySeverity", {}))
+                    except requests.HTTPError as http_exc:
+                        console.print(f"[yellow]Project lookup failed for {project_id}: {http_exc}")
+                    except Exception as exc:
+                        console.print(f"[yellow]Project lookup error for {project_id}: {exc}")
+
+                issue_id = row.get("ISSUE_URL")
+                if issue_id:
+                    match = re.search(r"issue-([^/?]+)", str(issue_id))
+                    if match:
+                        issue_key = match.group(1)
+                    else:
+                        issue_key = str(issue_id)
+                else:
+                    issue_key = row.get("PROBLEM_ID")
+
+                if org_id and issue_key:
+                    try:
+                        policy_map = self.get_org_policies(org_id)
+                        ignore_info = policy_map.get(issue_key)
+                        if ignore_info:
+                            ignore_reason = ignore_info.get("reason", "")
+                            ignore_reason_type = ignore_info.get("reason_type", "")
+                            ignore_notes = ignore_info.get("notes", "")
+                            ignored_since = ignore_info.get("ignored_since", "")
+                    except requests.HTTPError as http_exc:
+                        console.print(f"[yellow]Policy lookup failed for {org_id}: {http_exc}")
+                    except Exception as exc:
+                        console.print(f"[yellow]Policy lookup error for {org_id}: {exc}")
+
+                additional_cols["PROJECT_CREATED_AT"].append(project_created)
+                additional_cols["PROJECT_TOTAL_DEPENDENCIES"].append(project_dependencies)
+                additional_cols["PROJECT_SEVERITY_COUNTS"].append(severity_counts)
+                additional_cols["IGNORE_REASON"].append(ignore_reason)
+                additional_cols["IGNORE_REASON_TYPE"].append(ignore_reason_type)
+                additional_cols["IGNORE_NOTES"].append(ignore_notes)
+                additional_cols["IGNORED_SINCE"].append(ignored_since)
+
+            for col, values in additional_cols.items():
+                df[col] = values
+
+            try:
+                df.to_csv(file_path, index=False)
+                console.print(f"[green]✓ Enriched export file with project metadata and ignore info: {file_path}")
+            except Exception as exc:
+                console.print(f"[red]Failed to write enriched data to {file_path}: {exc}")
 
     def start_group_export(
         self,
@@ -246,7 +364,85 @@ class SnykExportAPI:
                 org_ids = [org.get('id') for org in orgs if org.get('id')]
                 user_filters = {"orgs": org_ids} if org_ids else {}
 
-            datasets = ["issues", "dependencies"]
+            # Ensure we have date filters (required by Snyk group export API)
+            user_filters = dict(user_filters) if user_filters else {}
+            date_filters: Dict[str, Any] = {}
+
+            def _normalize_datetime_input(raw: str, is_end: bool = False) -> Optional[str]:
+                if not raw:
+                    return None
+                raw = raw.strip()
+                if not raw:
+                    return None
+                try:
+                    dt = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ")
+                except ValueError:
+                    try:
+                        dt = datetime.strptime(raw, "%Y-%m-%d")
+                        if is_end:
+                            dt = dt + timedelta(days=1) - timedelta(seconds=1)
+                    except ValueError:
+                        console.print(
+                            f"[yellow]Invalid date format '{raw}'. Expected YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ."
+                        )
+                        return None
+                dt = dt.replace(tzinfo=timezone.utc)
+                return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            if Confirm.ask("Do you want to enter a custom date range?"):
+                console.print("[dim]Leave inputs blank to skip a particular bound.")
+                introduced_from_raw = self.get_user_input(
+                    "Introduced from (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ)", ""
+                )
+                introduced_to_raw = self.get_user_input(
+                    "Introduced to (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ)", ""
+                )
+                updated_from_raw = self.get_user_input(
+                    "Updated from (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ)", ""
+                )
+                updated_to_raw = self.get_user_input(
+                    "Updated to (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ)", ""
+                )
+
+                introduced_filter: Dict[str, str] = {}
+                intro_from_norm = _normalize_datetime_input(introduced_from_raw, is_end=False)
+                intro_to_norm = _normalize_datetime_input(introduced_to_raw, is_end=True)
+                if intro_from_norm:
+                    introduced_filter["from"] = intro_from_norm
+                if intro_to_norm:
+                    introduced_filter["to"] = intro_to_norm
+                if introduced_filter:
+                    date_filters["introduced"] = introduced_filter
+
+                updated_filter: Dict[str, str] = {}
+                updated_from_norm = _normalize_datetime_input(updated_from_raw, is_end=False)
+                updated_to_norm = _normalize_datetime_input(updated_to_raw, is_end=True)
+                if updated_from_norm:
+                    updated_filter["from"] = updated_from_norm
+                if updated_to_norm:
+                    updated_filter["to"] = updated_to_norm
+                if updated_filter:
+                    date_filters["updated"] = updated_filter
+
+                if not date_filters:
+                    console.print("[yellow]No valid date bounds entered. Using default last 30 days.")
+
+            if not date_filters:
+                end_date = datetime.utcnow().replace(tzinfo=timezone.utc)
+                start_date = end_date - timedelta(days=30)
+                date_filters["introduced"] = {
+                    "from": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "to": end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+                console.print(
+                    f"[dim]Using introduced date range {date_filters['introduced']['from']} to {date_filters['introduced']['to']}"
+                )
+
+            user_filters.update(date_filters)
+
+            datasets: List[str] = ["issues"]
+            if Confirm.ask("Do you want to include the dependencies dataset as well?", default=False):
+                datasets.append("dependencies")
 
             for dataset in datasets:
                 try:
@@ -268,6 +464,10 @@ class SnykExportAPI:
                             continue
 
                         console.print(f"[green]{dataset.capitalize()} group export started with ID: {export_id}")
+                        try:
+                            console.print(Panel(json.dumps(export_result, indent=2), title=f"{dataset} group export response"))
+                        except (TypeError, ValueError):
+                            console.print(f"[dim]Raw export response: {export_result}")
 
                         max_attempts = 60
                         attempts = 0
@@ -289,6 +489,7 @@ class SnykExportAPI:
                                         output_file=output_file,
                                         format=export_format,
                                     )
+                                    self.enrich_export_files(files)
                                     downloaded_files.extend(files)
                                     break
 
@@ -978,6 +1179,7 @@ class SnykExportAPI:
                                     if downloaded_file:
                                         console.print(f"[green]✓ {dataset.capitalize()} export saved to: {downloaded_file}")
                                         downloaded_files.append(downloaded_file)
+                                        self.enrich_export_files([downloaded_file])
                                     break
 
                                 elif export_status in ["failed", "cancelled"]:
