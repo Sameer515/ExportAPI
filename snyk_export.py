@@ -440,8 +440,7 @@ class SnykExportAPI:
             user_filters.update(date_filters)
 
             datasets: List[str] = ["issues"]
-            if Confirm.ask("Do you want to include the dependencies dataset as well?", default=False):
-                datasets.append("dependencies")
+            # Note: Dependencies dataset is not supported for group-level exports in the Snyk API
 
             for dataset in datasets:
                 try:
@@ -518,6 +517,8 @@ class SnykExportAPI:
             console.print(f"\n[red]Error during group export: {e}")
             import traceback
             traceback.print_exc()
+
+        return downloaded_files
 
     def log_export_summary(self, export_type: str, org_id: str, files: List[str]) -> None:
         """Log a summary of the export operation."""
