@@ -55,6 +55,16 @@ def main():
                     groups = snyk.list_groups()
                     if not groups:
                         console.print("[yellow]No groups found or you don't have permission to view groups.")
+                        console.print("[dim]You can still enter a group ID manually.")
+                        manual_group_id = input("Enter group ID: ").strip()
+                        if manual_group_id:
+                            selected_group_id = manual_group_id
+                            selected_group_name = manual_group_id
+                            console.print(f"[green]Selected group: {selected_group_name} (ID: {selected_group_id})")
+                            console.print(f"[dim]Group ID: {selected_group_id}")
+                            console.print(f"[dim]Group Name: {selected_group_name}")
+                        else:
+                            console.print("[red]No group ID entered. Returning to menu.")
                     else:
                         console.print("\n[bold]Available Groups:")
                         for i, group in enumerate(groups, 1):
