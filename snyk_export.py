@@ -338,7 +338,12 @@ class SnykExportAPI:
         return saved_files
     
     def start_group_export_workflow(
-        """Run group-level exports for issues and dependencies and download results."""
+        self,
+        group_id: str,
+        group_name: str = "unknown",
+        columns: Optional[List[str]] = None,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> List[str]:
         if not group_id:
             raise ValueError("Group ID is required")
 
@@ -1198,8 +1203,23 @@ class SnykExportAPI:
                                 
                         if attempts >= max_attempts:
                             console.print(f"[red]Timeout waiting for {dataset} export to complete.")
-                            
+
                 except Exception as e:
+                    console.print(f"[red]Error during {dataset} export: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+        except Exception as e:
+            console.print(f"\n[red]Error during export: {e}")
+            import traceback
+            traceback.print_exc()
+
+        self.log_export_summary("Single Organization Export", org_id, downloaded_files)
+        return downloaded_files
+
+    def log_export_summary(self, export_type: str, org_id: str, files: List[str]) -> None:
+        """Log a summary of the export operation."""
+        console.print(f"\n[green]Export Summary for {export_type} in {org_id}:")
         console.print(f"Files downloaded: {len(files)}")
         for file in files:
             console.print(f"  - {file}")
