@@ -536,6 +536,33 @@ class SnykExportAPI:
                 console.print(f"[green]✓ Combined export saved to: {combined_file}")
                 console.print(f"[dim]Combined file name: {combined_file}")
 
+        # Fetch and save project data
+        project_files = []
+        for org in self.list_organizations(group_id):
+            org_id = org.get('id')
+            if org_id:
+                try:
+                    projects = self.get_org_projects(org_id)
+                    for project in projects:
+                        project_id = project.get('id')
+                        if project_id:
+                            project_data = self.get_project_v1(org_id, project_id)
+                            if project_data:
+                                project_csv = f"exports/{timestamp}/snyk_project_{project_id}_{timestamp}.csv"
+                                self.save_project_to_csv(project_data, project_csv)
+                                project_files.append(project_csv)
+                                console.print(f"[green]✓ Project data saved to: {project_csv}")
+                except Exception as e:
+                    console.print(f"[red]Error fetching project data: {e}")
+
+        # Combine all files including project data
+        all_files = downloaded_files + project_files
+        if len(all_files) > 1:
+            final_combined_file = f"exports/{timestamp}/snyk_final_combined_export_{group_id[:8]}_{timestamp}.csv"
+            if self.combine_csv_files(all_files, final_combined_file):
+                console.print(f"[green]✓ Final combined export saved to: {final_combined_file}")
+                console.print(f"[dim]Final combined file name: {final_combined_file}")
+
         return downloaded_files
 
     def log_export_summary(self, export_type: str, org_id: str, files: List[str]) -> None:
@@ -1282,6 +1309,25 @@ class SnykExportAPI:
         except (EOFError, KeyboardInterrupt):
             console.print("\n[yellow]Operation cancelled by user.")
             sys.exit(0)
+    def get_org_projects(self, org_id: str) -> List[Dict[str, Any]]:
+        """Get all projects for an organization using the Snyk v1 API."""
+        try:
+            url = f"{self.V1_BASE}/org/{org_id}/projects"
+            response = requests.get(url, headers=self.headers_v1, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            return data.get('projects', [])
+        except requests.exceptions.RequestException as e:
+            console.print(f"[red]Error fetching projects for org {org_id}: {e}")
+            return []
+
+    def save_project_to_csv(self, project_data: Dict[str, Any], output_file: str) -> None:
+        """Save project data to a CSV file."""
+        try:
+            df = pd.DataFrame([project_data])
+            df.to_csv(output_file, index=False)
+        except Exception as e:
+            console.print(f"[red]Error saving project data to CSV: {e}")
     def get_project_last_tested_date(self, org_id: str, project_id: str) -> Optional[str]:
         """Retrieve the last tested date for a specific project.
 
