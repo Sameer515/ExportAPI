@@ -450,9 +450,7 @@ class SnykExportAPI:
 
             user_filters.update(date_filters)
 
-            datasets: List[str] = ["issues"]
-            if Confirm.ask("Do you want to include the usage dataset as well?", default=False):
-                datasets.append("usage")
+            datasets: List[str] = ["issues", "usage"]
 
             for dataset in datasets:
                 try:
@@ -529,6 +527,14 @@ class SnykExportAPI:
             console.print(f"\n[red]Error during group export: {e}")
             import traceback
             traceback.print_exc()
+
+        # Combine files if multiple datasets were exported
+        if len(downloaded_files) > 1:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            combined_file = f"exports/{timestamp}/snyk_combined_group_export_{group_id[:8]}_{timestamp}.csv"
+            if self.combine_csv_files(downloaded_files, combined_file):
+                console.print(f"[green]✓ Combined export saved to: {combined_file}")
+                console.print(f"[dim]Combined file name: {combined_file}")
 
         return downloaded_files
 
