@@ -451,7 +451,8 @@ class SnykExportAPI:
             user_filters.update(date_filters)
 
             datasets: List[str] = ["issues"]
-            # Note: Dependencies dataset is not supported for group-level exports in the Snyk API
+            if Confirm.ask("Do you want to include the usage dataset as well?", default=False):
+                datasets.append("usage")
 
             for dataset in datasets:
                 try:
@@ -821,8 +822,8 @@ class SnykExportAPI:
             primary_path = self.EXPORT_PATH.format(org_id=org_id)
             if export_type == "issues":
                 legacy_path = f"/orgs/{org_id}/issues/report"
-            elif export_type == "dependencies":
-                legacy_path = f"/orgs/{org_id}/dependencies/report"
+            elif export_type == "usage":
+                legacy_path = f"/orgs/{org_id}/usage/report"
             else:
                 legacy_path = f"/orgs/{org_id}/issues/report"
 
@@ -897,8 +898,8 @@ class SnykExportAPI:
             
         # Use generic exports status path; fallback to legacy report status
         primary = self.EXPORT_STATUS_PATH.format(org_id=org_id, export_id=export_id)
-        if dataset == "dependencies":
-            legacy = f"/orgs/{org_id}/dependencies/report/status/{export_id}"
+        if dataset == "usage":
+            legacy = f"/orgs/{org_id}/usage/report/status/{export_id}"
         else:
             legacy = f"/orgs/{org_id}/issues/report/status/{export_id}"
 
@@ -992,8 +993,8 @@ class SnykExportAPI:
             # Use generic export download; fallback to legacy report download by dataset
             dataset = attributes.get('dataset', 'issues')
             primary = self.EXPORT_DOWNLOAD_PATH.format(org_id=org_id, export_id=export_id)
-            if dataset == 'dependencies':
-                legacy = f"/orgs/{org_id}/dependencies/report/download/{export_id}"
+            if dataset == 'usage':
+                legacy = f"/orgs/{org_id}/usage/report/download/{export_id}"
             else:
                 legacy = f"/orgs/{org_id}/issues/report/download/{export_id}"
 
