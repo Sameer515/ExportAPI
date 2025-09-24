@@ -490,7 +490,7 @@ class SnykExportAPI:
 
                                 if export_status in ("complete", "finished"):
                                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                    output_file = f"snyk_group_export_{safe_group_name}_{group_id[:8]}_{dataset}_{timestamp}.{export_format}"
+                                    output_file = f"exports/snyk_group_export_{safe_group_name}_{group_id[:8]}_{dataset}_{timestamp}.{export_format}"
                                     files = self.download_group_export(
                                         group_id,
                                         status,
@@ -531,7 +531,7 @@ class SnykExportAPI:
         # Combine files if multiple datasets were exported
         if len(downloaded_files) > 1:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            combined_file = f"exports/{timestamp}/snyk_combined_group_export_{group_id[:8]}_{timestamp}.csv"
+            combined_file = f"exports/snyk_combined_group_export_{group_id[:8]}_{timestamp}.csv"
             if self.combine_csv_files(downloaded_files, combined_file):
                 console.print(f"[green]✓ Combined export saved to: {combined_file}")
                 console.print(f"[dim]Combined file name: {combined_file}")
@@ -548,7 +548,7 @@ class SnykExportAPI:
                         if project_id:
                             project_data = self.get_project_v1(org_id, project_id)
                             if project_data:
-                                project_csv = f"exports/{timestamp}/snyk_project_{project_id}_{timestamp}.csv"
+                                project_csv = f"exports/snyk_project_{project_id}_{timestamp}.csv"
                                 self.save_project_to_csv(project_data, project_csv)
                                 project_files.append(project_csv)
                                 console.print(f"[green]✓ Project data saved to: {project_csv}")
@@ -558,7 +558,7 @@ class SnykExportAPI:
         # Combine all files including project data
         all_files = downloaded_files + project_files
         if len(all_files) > 1:
-            final_combined_file = f"exports/{timestamp}/snyk_final_combined_export_{group_id[:8]}_{timestamp}.csv"
+            final_combined_file = f"exports/snyk_final_combined_export_{group_id[:8]}_{timestamp}.csv"
             if self.combine_csv_files(all_files, final_combined_file):
                 console.print(f"[green]✓ Final combined export saved to: {final_combined_file}")
                 console.print(f"[dim]Final combined file name: {final_combined_file}")
@@ -1245,7 +1245,7 @@ class SnykExportAPI:
 
                                 if export_status == "complete":
                                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                                    output_file = f"snyk_export_{safe_org_name}_{org_id[:8]}_{dataset}_{timestamp}.{export_format}"
+                                    output_file = f"exports/snyk_export_{safe_org_name}_{org_id[:8]}_{dataset}_{timestamp}.{export_format}"
                                     
                                     downloaded_file = self.download_export(
                                         status, output_file, export_format
