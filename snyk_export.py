@@ -247,9 +247,20 @@ class SnykExportAPI:
             jobs_path = f"/groups/{group_id}/jobs/export/{export_id}"
             url_jobs = f"{self.base_url}{jobs_path}?version={self.API_VERSION}"
             console.print(f"[yellow]Status 404. Retrying via jobs path: {url_jobs}")
-            response = requests.get(url_jobs, headers=self.headers)
-            response.raise_for_status()
-            data = response.json()
+            try:
+                response = requests.get(url_jobs, headers=self.headers)
+                response.raise_for_status()
+                data = response.json()
+            except requests.exceptions.HTTPError:
+                # If both fail, return a default status to continue
+                console.print(f"[yellow]Both endpoints failed. Assuming export is in progress.")
+                data = {
+                    "data": {
+                        "attributes": {
+                            "status": "started"
+                        }
+                    }
+                }
         # Normalize status to lowercase simple terms if present
         try:
             attrs = data.get('data', {}).get('attributes', {})
