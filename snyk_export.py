@@ -542,14 +542,28 @@ class SnykExportAPI:
             
             # Transform the response to ensure consistent structure
             groups = []
+            excluded_ids = {
+                "a8b06ecd-d0db-4a12-941d-c00691975a90",
+                "788993e3-0241-4cc7-885d-4789d2a41ec5",
+                "48ad8276-fee9-456b-a935-d75cc0ba063f",
+                "c0aa30b3-2123-46f3-8171-1c2953485c32",
+                "c655dde1-2a73-4f76-89b0-b7e7f0ae2dcd",
+                "8c6a7f7d-a46b-4d6a-98ee-5b44ff992519",
+                "8b9466b4-1f85-4fef-bf73-3b44184082fa",
+                "e7f5d5d2-f25d-45be-b9f7-58cb0b74aad7",
+                "26983627-fe27-4e94-bf8f-0050874cda60",
+                "492c82c0-8300-445d-9a64-7ce90cdc03db"
+            }
             for org in orgs_data.get('data', []):
-                attrs = org.get('attributes', {})
-                groups.append({
-                    'id': org.get('id'),
-                    'name': attrs.get('name', 'Unnamed Organization'),
-                    'type': 'organization',
-                    'attributes': attrs
-                })
+                org_id = org.get('id')
+                if org_id not in excluded_ids:
+                    attrs = org.get('attributes', {})
+                    groups.append({
+                        'id': org_id,
+                        'name': attrs.get('name', 'Unnamed Organization'),
+                        'type': 'organization',
+                        'attributes': attrs
+                    })
                 
             if not groups:
                 console.print("[yellow]No organizations found for the current user.[/]")
