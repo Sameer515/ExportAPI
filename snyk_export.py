@@ -1225,8 +1225,24 @@ class SnykExportAPI:
         except (EOFError, KeyboardInterrupt):
             console.print("\n[yellow]Operation cancelled by user.")
             sys.exit(0)
-        self.log_export_summary("Group Export", group_id, downloaded_files)
-        return downloaded_files
+    def get_project_last_tested_date(self, org_id: str, project_id: str) -> Optional[str]:
+        """Retrieve the last tested date for a specific project.
 
-    @staticmethod
-    def get_user_input(prompt: str, default: Optional[str] = None) -> str:
+        Args:
+            org_id: Organization ID
+            project_id: Project ID
+
+        Returns:
+            The last tested date as a string, or None if an error occurs
+        """
+        url = f"{self.V1_BASE}/org/{org_id}/project/{project_id}"
+        try:
+            response = requests.get(url, headers=self.headers_v1, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            last_tested_date = data.get("lastTestedDate")
+            console.print(f"[green]Last tested date for project {project_id}: {last_tested_date}")
+            return last_tested_date
+        except requests.exceptions.RequestException as e:
+            console.print(f"[red]Error fetching project last tested date: {e}")
+            return None

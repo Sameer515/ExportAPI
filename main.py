@@ -42,13 +42,14 @@ def main():
             console.print("2. List Organizations in Selected Group")
             console.print("3. Export for Single Organization")
             console.print("4. Export for All Organizations in Selected Group")
-            console.print("5. Advanced Export Settings")
-            console.print("6. View Available Filters and Columns")
-            console.print("7. Exit")
+            console.print("5. Retrieve Project Last Tested Date")
+            console.print("6. Advanced Export Settings")
+            console.print("7. View Available Filters and Columns")
+            console.print("8. Exit")
             
             # Get user choice
             try:
-                choice = input("\nEnter your choice (1-7): ").strip()
+                choice = input("\nEnter your choice (1-8): ").strip()
             except (EOFError, KeyboardInterrupt):
                 console.print("\n[yellow]Operation cancelled by user.")
                 return 0
@@ -250,6 +251,20 @@ def main():
                     traceback.print_exc()
             
             elif choice == "5":
+                # Retrieve Project Last Tested Date
+                try:
+                    org_id = input("Enter Organization ID: ").strip()
+                    project_id = input("Enter Project ID: ").strip()
+                    if org_id and project_id:
+                        snyk.get_project_last_tested_date(org_id, project_id)
+                    else:
+                        console.print("[red]Both Organization ID and Project ID are required.")
+                except (EOFError, KeyboardInterrupt):
+                    console.print("\n[yellow]Operation cancelled by user.")
+                except Exception as e:
+                    console.print(f"[red]Error: {e}")
+            
+            elif choice == "6":
                 # Advanced Export Settings
                 console.print("\n[bold]Advanced Export Settings:")
                 console.print("1. Set Custom Date Range")
@@ -268,7 +283,7 @@ def main():
                 else:
                     console.print("[red]Invalid choice.")
             
-            elif choice == "6":
+            elif choice == "7":
                 # Display available filters and columns
                 console.print("\n[bold]Available Filters:")
                 console.print("-" * 30)
@@ -282,12 +297,12 @@ def main():
                 console.print("\n[bold]Available Columns (dataset dependent):")
                 console.print("(Refer to Snyk docs for the full list by dataset)")
             
-            elif choice == "7":
+            elif choice == "8":
                 console.print("[bold]Goodbye!")
                 return 0
                 
             else:
-                console.print("[red]Invalid choice. Please enter a number between 1 and 7.")
+                console.print("[red]Invalid choice. Please enter a number between 1 and 8.")
 
     except Exception as e:
         console.print(f"\n[red]A fatal error occurred: {e}")
