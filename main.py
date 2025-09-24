@@ -42,12 +42,13 @@ def main():
             console.print("2. List Organizations in Selected Group")
             console.print("3. Export for Single Organization")
             console.print("4. Export for All Organizations in Selected Group")
-            console.print("5. View Available Filters and Columns")
-            console.print("6. Exit")
+            console.print("5. Advanced Export Settings")
+            console.print("6. View Available Filters and Columns")
+            console.print("7. Exit")
             
             # Get user choice
             try:
-                choice = input("\nEnter your choice (1-6): ").strip()
+                choice = input("\nEnter your choice (1-7): ").strip()
             except (EOFError, KeyboardInterrupt):
                 console.print("\n[yellow]Operation cancelled by user.")
                 return 0
@@ -249,6 +250,25 @@ def main():
                     traceback.print_exc()
             
             elif choice == "5":
+                # Advanced Export Settings
+                console.print("\n[bold]Advanced Export Settings:")
+                console.print("1. Set Custom Date Range")
+                console.print("2. Select Specific Datasets")
+                console.print("3. Configure Enrichment Options")
+                console.print("4. Back to Main Menu")
+                sub_choice = input("\nEnter your choice (1-4): ").strip()
+                if sub_choice == "1":
+                    console.print("[dim]Custom date range settings can be configured in the export workflow.[/]")
+                elif sub_choice == "2":
+                    console.print("[dim]Dataset selection is available in the export options.[/]")
+                elif sub_choice == "3":
+                    console.print("[dim]Enrichment is automatically applied to all exports.[/]")
+                elif sub_choice == "4":
+                    continue
+                else:
+                    console.print("[red]Invalid choice.")
+            
+            elif choice == "6":
                 # Display available filters and columns
                 console.print("\n[bold]Available Filters:")
                 console.print("-" * 30)
@@ -262,12 +282,12 @@ def main():
                 console.print("\n[bold]Available Columns (dataset dependent):")
                 console.print("(Refer to Snyk docs for the full list by dataset)")
             
-            elif choice == "6":
+            elif choice == "7":
                 console.print("[bold]Goodbye!")
                 return 0
                 
             else:
-                console.print("[red]Invalid choice. Please enter a number between 1 and 6.")
+                console.print("[red]Invalid choice. Please enter a number between 1 and 7.")
 
     except Exception as e:
         console.print(f"\n[red]A fatal error occurred: {e}")
