@@ -338,12 +338,6 @@ class SnykExportAPI:
         return saved_files
     
     def start_group_export_workflow(
-        self,
-        group_id: str,
-        group_name: str = "unknown",
-        columns: Optional[List[str]] = None,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[str]:
         """Run group-level exports for issues and dependencies and download results."""
         if not group_id:
             raise ValueError("Group ID is required")
@@ -515,8 +509,10 @@ class SnykExportAPI:
                     import traceback
                     traceback.print_exc()
 
-        except KeyboardInterrupt:
-            console.print("\n[red]Group export cancelled by user.")
+        except Exception as e:
+            console.print(f"\n[red]Error during group export: {e}")
+            import traceback
+            traceback.print_exc()
 
         return downloaded_files
     
