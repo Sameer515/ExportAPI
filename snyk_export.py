@@ -1127,9 +1127,12 @@ class SnykExportAPI:
             # Concatenate all DataFrames
             combined_df = pd.concat(dfs, ignore_index=True)
             
-            # Remove duplicate rows
+            # Remove duplicate rows based on PROJECT_PUBLIC_ID
             initial_count = len(combined_df)
-            combined_df = combined_df.drop_duplicates()
+            if 'PROJECT_PUBLIC_ID' in combined_df.columns:
+                combined_df = combined_df.drop_duplicates(subset=['PROJECT_PUBLIC_ID'], keep='first')
+            else:
+                combined_df = combined_df.drop_duplicates()
             removed_count = initial_count - len(combined_df)
             
             # Ensure the directory exists
@@ -1141,7 +1144,7 @@ class SnykExportAPI:
             
             console.print(f"[green]Combined {len(dfs)} files into {output_file}")
             if removed_count > 0:
-                console.print(f"[yellow]Removed {removed_count} duplicate rows")
+                console.print(f"[yellow]Removed {removed_count} duplicate rows based on PROJECT_PUBLIC_ID")
                 
             return True
             
