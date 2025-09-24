@@ -1314,6 +1314,9 @@ class SnykExportAPI:
         try:
             url = f"{self.V1_BASE}/org/{org_id}/projects"
             response = requests.get(url, headers=self.headers_v1, timeout=30)
+            if response.status_code == 410:
+                console.print(f"[yellow]Organization {org_id} is gone or inaccessible.")
+                return []
             response.raise_for_status()
             data = response.json()
             return data.get('projects', [])
