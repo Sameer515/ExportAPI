@@ -50,44 +50,48 @@ def main():
             
             if choice == "1":
                 # Select group
-                console.print("\n[bold]Available Groups:")
-                groups = [
-                    {"name": "Acme Company Organization", "id": "a8b06ecd-d0db-4a12-941d-c00691975a90"},
-                    {"name": "Actions", "id": "788993e3-0241-4cc7-885d-4789d2a41ec5"},
-                    {"name": "Azure DevOps Shop", "id": "48ad8276-fee9-456b-a935-d75cc0ba063f"},
-                    {"name": "backend", "id": "c0aa30b3-2123-46f3-8171-1c2953485c32"},
-                    {"name": "BitBucket", "id": "c655dde1-2a73-4f76-89b0-b7e7f0ae2dcd"},
-                    {"name": "Bitbucket Demo", "id": "8c6a7f7d-a46b-4d6a-98ee-5b44ff992519"},
-                    {"name": "Bitbucket Shop", "id": "8b9466b4-1f85-4fef-bf73-3b44184082fa"},
-                    {"name": "CBIR Dev Team", "id": "e7f5d5d2-f25d-45be-b9f7-58cb0b74aad7"},
-                    {"name": "CBIR Platform Team", "id": "26983627-fe27-4e94-bf8f-0050874cda60"},
-                    {"name": "Certification Demo", "id": "492c82c0-8300-445d-9a64-7ce90cdc03db"},
-                ]
-                for i, group in enumerate(groups, 1):
-                    console.print(f"{i}. {group['name']} (ID: {group['id']})")
-                sel = input("\nEnter group number or ID: ").strip()
-                if sel:
-                    gid = None
-                    gname = None
-                    if sel.isdigit():
-                        idx = int(sel)
-                        if 1 <= idx <= len(groups):
-                            gid = groups[idx-1]['id']
-                            gname = groups[idx-1]['name']
-                    if not gid:
-                        for g in groups:
-                            if g['id'] == sel:
-                                gid = g['id']
-                                gname = g['name']
-                                break
-                    if gid:
-                        selected_group_id = gid
-                        selected_group_name = gname
-                        console.print(f"[green]Selected group: {selected_group_name} (ID: {selected_group_id})")
-                        console.print(f"[dim]Group ID: {selected_group_id}")
-                        console.print(f"[dim]Group Name: {selected_group_name}")
+                try:
+                    console.print("\n[dim]Fetching groups...")
+                    groups = snyk.list_groups()
+                    if not groups:
+                        console.print("[yellow]No groups found or you don't have permission to view groups.")
                     else:
-                        console.print("[red]Invalid selection.")
+                        console.print("\n[bold]Available Groups:")
+                        for i, group in enumerate(groups, 1):
+                            group_name = group.get('name', 'Unnamed Group')
+                            gid = group.get('id', 'N/A')
+                            console.print(f"{i}. {group_name} (ID: {gid})")
+                        sel = input("\nEnter group number or ID: ").strip()
+                        if sel:
+                            gid = None
+                            gname = None
+                            if sel.isdigit():
+                                idx = int(sel)
+                                if 1 <= idx <= len(groups):
+                                    gid = groups[idx-1].get('id')
+                                    gname = groups[idx-1].get('name', '')
+                            if not gid:
+                                for g in groups:
+                                    if g.get('id') == sel:
+                                        gid = g.get('id')
+                                        gname = g.get('name', '')
+                                        break
+                            # Fallback: accept arbitrary ID even if not present in the list
+                            if not gid and sel:
+                                gid = sel
+                                gname = sel
+                            if gid:
+                                selected_group_id = gid
+                                selected_group_name = gname or gid
+                                console.print(f"[green]Selected group: {selected_group_name} (ID: {selected_group_id})")
+                                console.print(f"[dim]Group ID: {selected_group_id}")
+                                console.print(f"[dim]Group Name: {selected_group_name}")
+                            else:
+                                console.print("[red]Invalid selection.")
+                except Exception as e:
+                    console.print(f"[red]Error selecting group: {str(e)}")
+                    if hasattr(e, 'response') and hasattr(e.response, 'text'):
+                        console.print(f"[dim]Response: {e.response.text}")
             
             elif choice == "2":
                 console.print("[bold]Goodbye!")
