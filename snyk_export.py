@@ -1105,6 +1105,10 @@ class SnykExportAPI:
             combined_df = combined_df.drop_duplicates()
             removed_count = initial_count - len(combined_df)
             
+            # Ensure the directory exists
+            output_dir = os.path.dirname(output_file)
+            os.makedirs(output_dir, exist_ok=True)
+            
             # Save the combined DataFrame to a new CSV file
             combined_df.to_csv(output_file, index=False, quoting=csv.QUOTE_NONNUMERIC)
             
